@@ -1,0 +1,56 @@
+{
+  "id": "fiskaly-surrealdb-datasource",
+  "name": "SurrealDB",
+  "type": "datasource",
+  "info": {
+    "description": "Grafana Datasource Plugin for SurrealDB",
+    "author": {
+      "name": "fiskaly"
+    },
+    "keywords": ["datasource"],
+    "logos": {
+      "small": "img/logo-small.png",
+      "large": "img/logo-large.png"
+    },
+    "links": [],
+    "screenshots": [
+      {
+        "name": "Datasource",
+        "path": "img/screenshot-config-editor.png"
+      },
+      {
+        "name": "Query Raw",
+        "path": "img/screenshot-query-editor-raw.png"
+      },
+      {
+        "name": "Query Log Data",
+        "path": "img/screenshot-query-editor-log.png"
+      },
+      {
+        "name": "Query Metric Data",
+        "path": "img/screenshot-query-editor-metric.png"
+      }
+    ],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=10.0.3",
+    "plugins": []
+  },
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "alerting": true,
+  "annotations": false,
+  "autoEnabled": false,
+  "backend": true,
+  "category": "sql",
+  "executable": "gpx_surrealdb",
+  "logs": true,
+  "metrics": true,
+  "preload": false,
+  "queryOptions": {},
+  "routes": [],
+  "skipDataQuery": false,
+  "streaming": false,
+  "tracing": true
+}

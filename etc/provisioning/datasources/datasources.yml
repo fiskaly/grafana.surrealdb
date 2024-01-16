@@ -1,0 +1,18 @@
+---
+apiVersion: 1
+
+datasources:
+- name: 'surrealdb'
+  type: 'fiskaly-surrealdb-datasource'
+  access: proxy
+  isDefault: false
+  orgId: 1
+  version: 1
+  editable: true
+  jsonData:
+    location: 'surrealdb:8000'
+    nameaddr: 'test'
+    database: 'test'
+    username: 'root'
+  secureJsonData:
+    password: 'root'

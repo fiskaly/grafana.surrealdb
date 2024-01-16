@@ -1,0 +1,47 @@
+version: '3.0'
+
+services:
+  grafana:
+    container_name: "gfs" # Grafana Service    
+    platform: 'linux/amd64'
+    build:
+      context: ./.config
+      args:
+        grafana_image: ${GRAFANA_IMAGE:-grafana-oss} # https://hub.docker.com/r/grafana/grafana-oss/tags
+        grafana_version: ${GRAFANA_VERSION:-10.2.0}
+    ports:
+      - 3000:3000/tcp
+    volumes:
+      - ./dist:/var/lib/grafana/plugins/fiskaly-surrealdb-datasource
+      - ./etc/provisioning:/etc/grafana/provisioning
+
+  surrealdb:
+    container_name: "sdb" # SurrealDB
+    image: surrealdb/surrealdb:v1.1.0 # https://hub.docker.com/r/surrealdb/surrealdb/tags
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./.attic/surrealdb:/surreal.db
+    command: |
+      start
+      --allow-net
+      --allow-scripting
+      --log trace
+      --user root
+      --pass root
+      file://surreal.db
+
+  hurl:
+    container_name: "hdp" # Hurl-based Data Provisioning
+    image: ghcr.io/orange-opensource/hurl:4.2.0 # https://github.com/Orange-OpenSource/hurl/pkgs/container/hurl
+    depends_on:
+      grafana:
+        condition: service_started
+      surrealdb:
+        condition: service_started
+    volumes:
+      - ./etc/data.hurl:/data.hurl
+    command: |
+      --variable SERVICE=http://surrealdb:8000
+      /data.hurl
