@@ -10,7 +10,6 @@ export interface MyQuery extends DataQuery {
     mode?: string;
     surql: string;
     requery: boolean;
-    unsupervised: boolean;
     timestamp: string;
     logMessage: string;
     metricData: string;
@@ -24,7 +23,6 @@ export const DEFAULT_QUERY: Partial<MyQuery> =
 { mode: "raw"
 , surql: "info for namespace"
 , requery: true
-, unsupervised: false
 , timestamp: ""
 , logMessage: ""
 , metricData: ""
