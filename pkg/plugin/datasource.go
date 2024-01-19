@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"reflect"
 	"slices"
 	"sort"
@@ -25,9 +24,8 @@ var datasource_surql []byte
 
 // https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go/backend
 var (
-	_ backend.QueryDataHandler    = (*Datasource)(nil)
-	_ backend.CheckHealthHandler  = (*Datasource)(nil)
-	_ backend.CallResourceHandler = (*Datasource)(nil)
+	_ backend.QueryDataHandler   = (*Datasource)(nil)
+	_ backend.CheckHealthHandler = (*Datasource)(nil)
 )
 
 // https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt
@@ -40,12 +38,19 @@ type dataModel struct {
 	Namespace string `json:"nameaddr"`
 	Database  string `json:"database"`
 	Username  string `json:"username"`
-	Password  string `json:"password"` // secrets
 }
 
 type Datasource struct {
 	db     *surrealdb.DB
-	config dataModel
+	config configuration
+}
+
+type configuration struct {
+	Location  string
+	Namespace string
+	Database  string
+	Username  string
+	Password  string
 }
 
 // https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go/backend#DataSourceInstanceSettings
@@ -59,7 +64,7 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		return undefined, err
 	}
 
-	config := dataModel{
+	config := configuration{
 		Location:  "localhost:8000",
 		Namespace: "default",
 		Database:  "default",
@@ -163,6 +168,7 @@ func (r *Datasource) QueryData(ctx context.Context, req *backend.QueryDataReques
 }
 
 type queryModel struct {
+	Hide          bool     `json:"hide"` // inherited
 	Mode          string   `json:"mode"`
 	SurQL         string   `json:"surql"`
 	Requery       bool     `json:"requery"`
@@ -218,7 +224,7 @@ func (r QueryMode) String() string {
 	case MetricQueryMode:
 		return _METRIC
 	default:
-		panic(fmt.Sprintf("invalid QueryMode state '%d'", r))
+		return ""
 	}
 }
 
@@ -250,6 +256,10 @@ func (r *Datasource) queryData(ctx context.Context, pCtx backend.PluginContext, 
 			backend.StatusBadRequest,
 			fmt.Sprintf("Query json: %v", err.Error()),
 		)
+	}
+
+	if query.Hide {
+		return backend.DataResponse{}
 	}
 
 	queryMode, err := NewQueryMode(query.Mode)
@@ -631,27 +641,6 @@ func (r *Datasource) typeConversion(field interface{}) interface{} {
 	}
 
 	return result
-}
-
-func (r *Datasource) CallResource(ctx context.Context, request *backend.CallResourceRequest, response backend.CallResourceResponseSender) error {
-	// log.DefaultLogger.Info(fmt.Sprintf("CallResource: %s", request.Path))
-
-	switch request.Path {
-	// case "TODO":
-	// 	return response.Send(
-	// 		&backend.CallResourceResponse{
-	// 			Status: http.StatusOK,
-	// 			Body:   []byte(`{}`),
-	// 		},
-	// 	)
-	default:
-		return response.Send(
-			&backend.CallResourceResponse{
-				Status: http.StatusNotFound,
-				Body:   []byte(`{}`),
-			},
-		)
-	}
 }
 
 func (r *Datasource) query(query string) (queryResponseData, error) {
