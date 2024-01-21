@@ -21,15 +21,15 @@ export interface MyQuery extends DataQuery {
 
 export const DEFAULT_QUERY: Partial<MyQuery> =
 { mode: "raw"
-, surql: "info for namespace"
+, surql: "info for database"
 , requery: true
 , timestamp: ""
 , logMessage: ""
 , metricData: ""
 , rate: false
-, rateZero: false
+, rateZero: true
 , rateInterval: ""
-, rateFunctions: []
+, rateFunctions: [ "count" ]
 };
 
 /**
@@ -39,6 +39,7 @@ export interface MyDataSourceOptions extends DataSourceJsonData {
     location?: string;
     nameaddr?: string;
     database?: string;
+    scope?: string;
     username?: string;
 }
 
