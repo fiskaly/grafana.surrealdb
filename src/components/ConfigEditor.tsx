@@ -12,7 +12,11 @@ export function ConfigEditor(props: Props) {
    
   return (
     <div className="gf-form-group">
-      <InlineField label="Location" labelWidth={12}>
+      <InlineField
+        label="Location"
+        labelWidth={14}
+        tooltip="Websocket location in the format `address:port`."
+      >
         <Input
           value={jsonData.location || ''}
           placeholder="localhost:8000"
@@ -27,7 +31,11 @@ export function ConfigEditor(props: Props) {
 	  }}
         />
       </InlineField>
-      <InlineField label="Namespace" labelWidth={12}>
+      <InlineField
+        label="Namespace"
+        labelWidth={14}
+        tooltip="Namespace used for the signin operation."
+      >
         <Input
           value={jsonData.nameaddr || ''}
           placeholder="default"
@@ -43,7 +51,11 @@ export function ConfigEditor(props: Props) {
 	  }}
         />
       </InlineField>
-      <InlineField label="Database" labelWidth={12}>
+      <InlineField
+        label="Database"
+        labelWidth={14}
+        tooltip="Database used for the signin operation."
+      >
         <Input
           value={jsonData.database || ''}
           placeholder="default"
@@ -59,10 +71,34 @@ export function ConfigEditor(props: Props) {
 	  }}
         />
       </InlineField>
-      <InlineField label="Username" labelWidth={12}>
+      <InlineField
+        label="Scope"
+        labelWidth={14}
+        tooltip="Optional scope used for the signin operation."
+      >
+        <Input
+          value={jsonData.scope || ''}
+          placeholder=""
+          width={40}
+          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+	      onOptionsChange({
+		  ...options,
+		  jsonData: {
+		      ...options.jsonData,
+		      scope: event.target.value,
+		  },
+	      });
+	  }}
+        />
+      </InlineField>
+      <InlineField
+        label="Username"
+        labelWidth={14}
+        tooltip="User used for the signin operation."
+      >
         <Input
           value={jsonData.username || ''}
-          placeholder="root"
+          placeholder="username"
           width={40}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
 	      onOptionsChange({
@@ -75,10 +111,14 @@ export function ConfigEditor(props: Props) {
 	  }}
         />
       </InlineField>
-      <InlineField label="Password" labelWidth={12}>
+      <InlineField
+        label="Password"
+        labelWidth={14}
+        tooltip="Password used for the signin operation."
+      >
         <SecretInput
           value={secureJsonData.password || ''}
-          placeholder="root"
+          placeholder="password"
           width={40}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
 	      onOptionsChange({
