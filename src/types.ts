@@ -7,29 +7,22 @@ import
 } from '@grafana/schema';
 
 export interface MyQuery extends DataQuery {
-    mode?: string;
+    mode: string;
     surql: string;
     requery: boolean;
-    timestamp: string;
-    logMessage: string;
-    metricData: string;
-    rate: boolean;
-    rateZero: boolean;
-    rateInterval: string;
-    rateFunctions: string[];
+    timestamp?: string;
+    logMessage?: string;
+    metricData?: string;
+    rate?: boolean;
+    rateZero?: boolean;
+    rateInterval?: string;
+    rateFunctions?: string[];
 }
 
 export const DEFAULT_QUERY: Partial<MyQuery> =
 { mode: "raw"
 , surql: "info for database"
 , requery: true
-, timestamp: ""
-, logMessage: ""
-, metricData: ""
-, rate: false
-, rateZero: true
-, rateInterval: ""
-, rateFunctions: [ "count" ]
 };
 
 /**
