@@ -83,19 +83,10 @@
             "type": "fiskaly-surrealdb-datasource",
             "uid": "fiskaly-surrealdb-datasource"
           },
-          "logMessage": "",
-          "metricData": "",
           "mode": "raw",
-          "rate": false,
-          "rateFunctions": [
-            "count"
-          ],
-          "rateInterval": "",
-          "rateZero": true,
           "refId": "A",
           "requery": true,
-          "surql": "info for database",
-          "timestamp": ""
+          "surql": "info for database"
         }
       ],
       "title": "Database Information",
@@ -168,19 +159,10 @@
             "type": "fiskaly-surrealdb-datasource",
             "uid": "fiskaly-surrealdb-datasource"
           },
-          "logMessage": "",
-          "metricData": "",
           "mode": "raw",
-          "rate": false,
-          "rateFunctions": [
-            "count"
-          ],
-          "rateInterval": "",
-          "rateZero": true,
           "refId": "A",
           "requery": true,
-          "surql": "select * from timeseries:[$from]..[$to]",
-          "timestamp": ""
+          "surql": "select * from timeseries:[$from]..[$to]"
         }
       ],
       "title": "Timeseries Data Table",
@@ -272,19 +254,10 @@
             "type": "fiskaly-surrealdb-datasource",
             "uid": "fiskaly-surrealdb-datasource"
           },
-          "logMessage": "",
-          "metricData": "",
           "mode": "raw",
-          "rate": false,
-          "rateFunctions": [
-            "count"
-          ],
-          "rateInterval": "",
-          "rateZero": true,
           "refId": "A",
           "requery": true,
-          "surql": "select * from timeseries:..[$to]",
-          "timestamp": ""
+          "surql": "select * from timeseries:..[$to]"
         }
       ],
       "title": "Timeseries Value",
