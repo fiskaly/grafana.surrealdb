@@ -41,6 +41,22 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
     , rateFunctions
     } = query;
 
+    if( query.rate === undefined ){
+	query.rate = false
+    }
+
+    if( query.rateZero === undefined ){
+	query.rateZero = true
+    }
+
+    if( query.rateInterval === undefined ){
+	query.rateInterval = ""
+    }
+
+    if( query.rateFunctions === undefined ){
+	query.rateFunctions = [ "count" ]
+    }
+
     return (
 <div className="gf-form">
   <VerticalGroup>
@@ -56,7 +72,7 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
         isClearable={false}
         backspaceRemovesValue={false}
         onChange={(selected: SelectableValue<string>) => {
-            onChange({ ...query, mode: selected.value });
+            onChange({ ...query, mode: selected.value || "raw" });
             onRunQuery();
         }}
         options={
@@ -69,7 +85,7 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
         maxMenuHeight={500}
         placeholder={"placeholder"}
         noOptionsMessage={"No options found"}
-        value={ mode || "raw" }
+        value={ mode }
         width={14}
       />
       </InlineField>
@@ -239,7 +255,7 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
       >
       <div style={{ minWidth: 245 }}>
       <QueryField
-        placeholder={""}
+        placeholder={"$interval"}
         portalOrigin=""
         query={rateInterval}
         disabled={false}
@@ -273,15 +289,16 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
             }
         }}
         options={
-            [ { value: "absence", label: "Absence" }
+            [ { value: "count", label: "Count" }
+            , { value: "absence", label: "Absence" }
+            , { value: "sum", label: "Sum" }
             , { value: "average", label: "Average" }
             , { value: "median", label: "Median" }
-            , { value: "sum", label: "Sum" }
-            , { value: "stddev", label: "StdDev" }
             , { value: "quantile25", label: "Quantile25" }
             , { value: "quantile75", label: "Quantile75" }
             , { value: "quantile95", label: "Quantile95" }
             , { value: "quantile99", label: "Quantile99" }
+            , { value: "stddev", label: "StdDev" }
             ]
         }
         isSearchable={true}

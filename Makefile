@@ -12,7 +12,9 @@ all: local
 build: .attic
 build: assets
 	mage -v build:linux
+ifndef DEVELOPMENT
 	npm run build
+endif
 
 test:
 	npm run test:ci
@@ -33,6 +35,9 @@ local-clean:
 
 sign:
 	npx @grafana/sign-plugin@latest
+
+check:
+	npx @grafana/levitate@latest is-compatible --path src/module.ts --target @grafana/data,@grafana/ui,@grafana/runtime
 
 clean:
 	rm -rf ./dist

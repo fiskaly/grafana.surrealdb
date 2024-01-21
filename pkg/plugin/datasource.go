@@ -2,12 +2,10 @@ package plugin
 
 import (
 	"context"
-	_ "embed"
 	"encoding/json"
 	"fmt"
-	"net/http"
+	"math"
 	"reflect"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,14 +18,10 @@ import (
 	"github.com/surrealdb/surrealdb.go"
 )
 
-//go:embed datasource.surql
-var datasource_surql []byte
-
 // https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go/backend
 var (
-	_ backend.QueryDataHandler    = (*Datasource)(nil)
-	_ backend.CheckHealthHandler  = (*Datasource)(nil)
-	_ backend.CallResourceHandler = (*Datasource)(nil)
+	_ backend.QueryDataHandler   = (*Datasource)(nil)
+	_ backend.CheckHealthHandler = (*Datasource)(nil)
 )
 
 // https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt
@@ -35,34 +29,44 @@ var (
 	_ instancemgmt.InstanceDisposer = (*Datasource)(nil)
 )
 
-type dataModel struct {
+type datasourceOptions struct {
 	Location  string `json:"location"`
 	Namespace string `json:"nameaddr"`
 	Database  string `json:"database"`
+	Scope     string `json:"scope"`
 	Username  string `json:"username"`
-	Password  string `json:"password"` // secrets
 }
 
 type Datasource struct {
 	db     *surrealdb.DB
-	config dataModel
+	config configuration
+}
+
+type configuration struct {
+	Location  string
+	Namespace string
+	Database  string
+	Scope     string
+	Username  string
+	Password  string
 }
 
 // https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go/backend#DataSourceInstanceSettings
 func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 	var undefined instancemgmt.Instance
 
-	var jsonData dataModel
+	var jsonData datasourceOptions
 	err := json.Unmarshal(settings.JSONData, &jsonData)
 	if err != nil {
 		log.DefaultLogger.Error("JSONData", "Error", err)
 		return undefined, err
 	}
 
-	config := dataModel{
+	config := configuration{
 		Location:  "localhost:8000",
 		Namespace: "default",
 		Database:  "default",
+		Scope:     "",
 		Username:  "root",
 		Password:  "root",
 	}
@@ -75,6 +79,9 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	}
 	if jsonData.Database != "" {
 		config.Database = jsonData.Database
+	}
+	if jsonData.Scope != "" {
+		config.Scope = jsonData.Scope
 	}
 	if jsonData.Username != "" {
 		config.Username = jsonData.Username
@@ -93,29 +100,25 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		return undefined, err
 	}
 
-	if _, err = db.Signin(map[string]interface{}{
+	// https://docs.surrealdb.com/docs/integration/websocket/#signin
+	signinParameters := map[string]interface{}{
+		"NS":   config.Namespace,
+		"DB":   config.Database,
 		"user": config.Username,
 		"pass": config.Password,
-	}); err != nil {
-		return undefined, err
+	}
+	if config.Scope != "" {
+		signinParameters["SC"] = config.Scope
 	}
 
-	if _, err = db.Use(
-		config.Namespace,
-		config.Database,
-	); err != nil {
+	_, err = db.Signin(signinParameters)
+	if err != nil {
 		return undefined, err
 	}
 
 	r := &Datasource{
 		db:     db,
 		config: config,
-	}
-
-	// pre-load the 'fn::grafana::rate' function
-	_, err = r.query(string(datasource_surql))
-	if err != nil {
-		return undefined, err
 	}
 
 	return r, nil
@@ -138,6 +141,7 @@ return
 , origin : session::origin()
 }
 `
+
 	_, err := r.query(query)
 	if err != nil {
 		status = backend.HealthStatusError
@@ -162,7 +166,8 @@ func (r *Datasource) QueryData(ctx context.Context, req *backend.QueryDataReques
 	return response, nil
 }
 
-type queryModel struct {
+type queryRequestData struct {
+	Hide          bool     `json:"hide"` // inherited
 	Mode          string   `json:"mode"`
 	SurQL         string   `json:"surql"`
 	Requery       bool     `json:"requery"`
@@ -181,45 +186,15 @@ type queryResponseData struct {
 	result interface{}
 }
 
-type QueryMode uint8
-
-const (
-	_RAW    = "raw"
-	_LOG    = "log"
-	_METRIC = "metric"
-)
-
-const (
-	UndefinedQueryMode QueryMode = iota
-	RawQueryMode
-	LogQueryMode
-	MetricQueryMode
-)
-
-func NewQueryMode(value string) (QueryMode, error) {
-	switch value {
-	case _RAW:
-		return RawQueryMode, nil
-	case _LOG:
-		return LogQueryMode, nil
-	case _METRIC:
-		return MetricQueryMode, nil
-	default:
-		return UndefinedQueryMode, fmt.Errorf("unsupported query mode '%s'", value)
-	}
-}
-
-func (r QueryMode) String() string {
-	switch r {
-	case RawQueryMode:
-		return _RAW
-	case LogQueryMode:
-		return _LOG
-	case MetricQueryMode:
-		return _METRIC
-	default:
-		panic(fmt.Sprintf("invalid QueryMode state '%d'", r))
-	}
+type queryData struct {
+	request  queryRequestData
+	response queryResponseData
+	timeNow  time.Time
+	timeFrom time.Time
+	timeTo   time.Time
+	interval time.Duration
+	name     string
+	mode     QueryMode
 }
 
 func (r *Datasource) queryData(ctx context.Context, pCtx backend.PluginContext, dataQuery backend.DataQuery) backend.DataResponse {
@@ -242,9 +217,9 @@ func (r *Datasource) queryData(ctx context.Context, pCtx backend.PluginContext, 
 	// 	fmt.Sprintf("query: %s", dataQuery.JSON),
 	// )
 
-	var query queryModel
+	var queryRequest queryRequestData
 
-	err := json.Unmarshal(dataQuery.JSON, &query)
+	err := json.Unmarshal(dataQuery.JSON, &queryRequest)
 	if err != nil {
 		return backend.ErrDataResponse(
 			backend.StatusBadRequest,
@@ -252,7 +227,11 @@ func (r *Datasource) queryData(ctx context.Context, pCtx backend.PluginContext, 
 		)
 	}
 
-	queryMode, err := NewQueryMode(query.Mode)
+	if queryRequest.Hide {
+		return backend.DataResponse{}
+	}
+
+	queryMode, err := NewQueryMode(queryRequest.Mode)
 	if err != nil {
 		return backend.ErrDataResponse(
 			backend.StatusBadRequest,
@@ -260,89 +239,14 @@ func (r *Datasource) queryData(ctx context.Context, pCtx backend.PluginContext, 
 		)
 	}
 
-	// log.DefaultLogger.Info(
-	// 	fmt.Sprintf(
-	// 		"query: %v, from: %s, to: %s, type: %s, refId: %s, mdp: %s, int: %s, mode: '%s'",
-	// 		query,
-	// 		queryTimeFrom.Format(time.RFC3339Nano),
-	// 		queryTimeTo.Format(time.RFC3339Nano),
-	// 		dataQuery.QueryType,     // ?
-	// 		dataQuery.RefID,         // string
-	// 		dataQuery.MaxDataPoints, // int64
-	// 		dataQuery.Interval,      // time.Time
-	// 		queryMode.String(),
-	// 	),
-	// )
+	surql := queryRequest.SurQL
 
-	surql := query.SurQL
-
-	if strings.HasPrefix(surql, "select") == false &&
-		strings.HasPrefix(surql, "SELECT") == false &&
-		strings.HasPrefix(surql, "info") == false &&
-		strings.HasPrefix(surql, "INFO") == false &&
-		strings.HasPrefix(surql, "return") == false &&
-		strings.HasPrefix(surql, "RETURN") == false {
-		return backend.ErrDataResponse(
-			backend.StatusBadRequest,
-			fmt.Sprintf("Query `%s` is not allowed", surql),
-		)
+	if queryRequest.Timestamp == "" {
+		queryRequest.Timestamp = "timestamp"
 	}
 
-	if query.Timestamp == "" {
-		query.Timestamp = "timestamp"
-	}
-
-	if query.MetricData == "" {
-		query.MetricData = "value"
-	}
-
-	if queryMode == MetricQueryMode && query.Rate {
-
-		rateFunctions := []string{"absence", "average", "sum", "median", "stddev", "quantile25", "quantile75", "quantile95", "quantile99"}
-		quantiles := []string{}
-
-		options := fmt.Sprintf(
-			"{ time : { key : %q }, value : { key : %q",
-			query.Timestamp,
-			query.MetricData,
-		)
-
-		if query.RateZero {
-			options = options + ", zero : true"
-		}
-
-		for _, rateFunction := range rateFunctions {
-			if slices.Contains(query.RateFunctions, rateFunction) {
-				if strings.HasPrefix(rateFunction, "quantile") {
-					quantile := rateFunction[8:len(rateFunction)]
-					quantiles = append(quantiles, quantile)
-				} else {
-					options = options + ", " + rateFunction + " : true"
-				}
-			}
-		}
-
-		if len(quantiles) > 0 {
-			options = options + ", quantile : [ "
-			for _, quantile := range quantiles {
-				options = options + quantile + ", "
-			}
-			options = options[:len(options)-2] + "]"
-		}
-
-		options = options + "} }"
-
-		queryRateInterval := query.RateInterval
-		if queryRateInterval == "" {
-			queryRateInterval = "$interval"
-		}
-
-		surql = fmt.Sprintf(
-			"fn::rate( %s, $from, $to, %s, %s )",
-			queryRateInterval,
-			options,
-			surql,
-		)
+	if queryRequest.MetricData == "" {
+		queryRequest.MetricData = "value"
 	}
 
 	surql = strings.Replace(surql, "$interval", queryInterval.String(), -1)
@@ -356,6 +260,17 @@ func (r *Datasource) queryData(ctx context.Context, pCtx backend.PluginContext, 
 			backend.StatusBadRequest,
 			fmt.Sprintf("Query failed: %v", err.Error()),
 		)
+	}
+
+	query := queryData{
+		request:  queryRequest,
+		response: queryResponse,
+		timeNow:  queryTimeNow,
+		timeFrom: queryTimeFrom,
+		timeTo:   queryTimeTo,
+		interval: queryInterval,
+		name:     queryName,
+		mode:     queryMode,
 	}
 
 	var preferredVisualization data.VisType
@@ -386,7 +301,7 @@ func (r *Datasource) queryData(ctx context.Context, pCtx backend.PluginContext, 
 			// Result   string `json:"result"`
 			// Request  string `json:"request"`
 		}{
-			QueryRaw: fmt.Sprintf("%s", query.SurQL),
+			QueryRaw: fmt.Sprintf("%s", queryRequest.SurQL),
 			QueryRun: fmt.Sprintf("%s", surql),
 			Status:   fmt.Sprintf("%s", queryResponse.status),
 			Time:     fmt.Sprintf("%s", queryResponse.time),
@@ -397,7 +312,7 @@ func (r *Datasource) queryData(ctx context.Context, pCtx backend.PluginContext, 
 
 	var dataResponse backend.DataResponse
 
-	err = r.process(&query, queryName, queryResponse.result, frameMeta, &dataResponse)
+	err = r.process(&query, query.name, query.response.result, frameMeta, &dataResponse)
 	if err != nil {
 		return backend.ErrDataResponse(
 			backend.StatusBadRequest,
@@ -405,10 +320,30 @@ func (r *Datasource) queryData(ctx context.Context, pCtx backend.PluginContext, 
 		)
 	}
 
+	if queryMode == MetricQueryMode {
+		err = r.metric(&query, &dataResponse)
+		if err != nil {
+			return backend.ErrDataResponse(
+				backend.StatusBadRequest,
+				fmt.Sprintf("Metric failed: %v", err.Error()),
+			)
+		}
+
+		if query.request.Rate {
+			err = r.metricRate(&query, &dataResponse)
+			if err != nil {
+				return backend.ErrDataResponse(
+					backend.StatusBadRequest,
+					fmt.Sprintf("Rate failed: %v", err.Error()),
+				)
+			}
+		}
+	}
+
 	return dataResponse
 }
 
-func (r *Datasource) process(query *queryModel, name string, result interface{}, frameMeta *data.FrameMeta, dataResponse *backend.DataResponse) error {
+func (r *Datasource) process(query *queryData, name string, result interface{}, frameMeta *data.FrameMeta, dataResponse *backend.DataResponse) error {
 
 	if result == nil {
 		frame, err := r.result(query, name, "null")
@@ -473,9 +408,7 @@ func (r *Datasource) process(query *queryModel, name string, result interface{},
 	return fmt.Errorf("not supported query result type '%s'", reflect.TypeOf(result))
 }
 
-func (r *Datasource) result(query *queryModel, name string, value interface{}) (*data.Frame, error) {
-	// var undefined *data.Frame
-
+func (r *Datasource) result(query *queryData, name string, value interface{}) (*data.Frame, error) {
 	head := make(map[string]int)
 	table := make([]map[string]interface{}, 0)
 
@@ -485,9 +418,7 @@ func (r *Datasource) result(query *queryModel, name string, value interface{}) (
 	return r.frame(query, name, head, table)
 }
 
-func (r *Datasource) table(query *queryModel, name string, array []interface{}) (*data.Frame, error) {
-	// var undefined *data.Frame
-
+func (r *Datasource) table(query *queryData, name string, array []interface{}) (*data.Frame, error) {
 	head := make(map[string]int)
 	table := make([]map[string]interface{}, 0)
 
@@ -517,9 +448,7 @@ func (r *Datasource) table(query *queryModel, name string, array []interface{}) 
 
 // https://grafana.com/developers/plugin-tools/introduction/data-frames
 // https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go/data#Frame
-func (r *Datasource) frame(query *queryModel, name string, head map[string]int, table []map[string]interface{}) (*data.Frame, error) {
-	// var undefined *data.Frame
-
+func (r *Datasource) frame(query *queryData, name string, head map[string]int, table []map[string]interface{}) (*data.Frame, error) {
 	frame := data.NewFrame(name)
 
 	columns := make(map[string][]string)
@@ -555,7 +484,7 @@ func (r *Datasource) frame(query *queryModel, name string, head map[string]int, 
 	fields := make(map[string]interface{})
 	keys := make([]string, 0)
 
-	timestampKey := query.Timestamp
+	timestampKey := query.request.Timestamp
 	timestampColumn, timestampExists := columns[timestampKey]
 	if timestampExists {
 		timestamps := make([]*time.Time, len(timestampColumn))
@@ -633,27 +562,6 @@ func (r *Datasource) typeConversion(field interface{}) interface{} {
 	return result
 }
 
-func (r *Datasource) CallResource(ctx context.Context, request *backend.CallResourceRequest, response backend.CallResourceResponseSender) error {
-	// log.DefaultLogger.Info(fmt.Sprintf("CallResource: %s", request.Path))
-
-	switch request.Path {
-	// case "TODO":
-	// 	return response.Send(
-	// 		&backend.CallResourceResponse{
-	// 			Status: http.StatusOK,
-	// 			Body:   []byte(`{}`),
-	// 		},
-	// 	)
-	default:
-		return response.Send(
-			&backend.CallResourceResponse{
-				Status: http.StatusNotFound,
-				Body:   []byte(`{}`),
-			},
-		)
-	}
-}
-
 func (r *Datasource) query(query string) (queryResponseData, error) {
 	var undefined queryResponseData
 
@@ -702,4 +610,335 @@ func (r *Datasource) query(query string) (queryResponseData, error) {
 		time:   responseTime,
 		result: result,
 	}, nil
+}
+
+func (r *Datasource) metric(query *queryData, dataResponse *backend.DataResponse) error {
+	frames := dataResponse.Frames
+
+	var timeField *data.Field
+	var dataField *data.Field
+
+	if len(frames) != 1 {
+		return fmt.Errorf("multiple frames are not supported yet")
+	}
+
+	timeFieldName := query.request.Timestamp
+	dataFieldName := query.request.MetricData
+	suggestions := ""
+
+	frame := frames[0]
+	for _, field := range frame.Fields {
+		fieldName := field.Name
+		if suggestions == "" {
+			suggestions = fieldName
+		} else {
+			suggestions = suggestions + ", " + fieldName
+		}
+
+		if fieldName == timeFieldName {
+			timeField = field
+			continue
+		}
+		if fieldName == dataFieldName {
+			dataField = field
+			continue
+		}
+	}
+
+	if len(frame.Fields) == 0 {
+		timeField = data.NewField(timeFieldName, nil, []*time.Time{})
+		dataField = data.NewField(dataFieldName, nil, []*float64{})
+	}
+
+	if timeField == nil {
+		return fmt.Errorf(
+			"time field '%s' not found in data frame, available are: %v",
+			timeFieldName,
+			suggestions,
+		)
+	}
+	if dataField == nil {
+		return fmt.Errorf(
+			"data field '%s' not found in data frame, available are: %v",
+			dataFieldName,
+			suggestions,
+		)
+	}
+
+	frame.Fields = []*data.Field{timeField, dataField}
+
+	return nil
+}
+
+func (r *Datasource) metricRate(query *queryData, dataResponse *backend.DataResponse) error {
+	frames := dataResponse.Frames
+
+	if len(frames) != 1 {
+		return fmt.Errorf("multiple frames are not supported yet")
+	}
+	frame := frames[0]
+
+	timeField := frame.Fields[0] // see 'metric()'
+	dataField := frame.Fields[1] // see 'metric()'
+
+	from_ns := query.timeFrom.UnixNano()
+	to_ns := query.timeTo.UnixNano()
+	interval_ns := query.interval.Nanoseconds()
+
+	zeroVector := query.request.RateZero
+
+	queryRateInterval := query.request.RateInterval
+	if queryRateInterval != "" {
+		queryRateInterval = strings.Replace(queryRateInterval, "$interval", query.interval.String(), -1)
+
+		rateInterval, err := time.ParseDuration(queryRateInterval)
+		if err != nil {
+			return fmt.Errorf("invalid interval '%s': %w", queryRateInterval, err)
+		}
+		interval_ns = rateInterval.Nanoseconds()
+	}
+
+	rateFunctions := map[string]bool{
+		"count":      false,
+		"absence":    false,
+		"sum":        false,
+		"average":    false,
+		"median":     false,
+		"quantile25": false,
+		"quantile75": false,
+		"quantile95": false,
+		"quantile99": false,
+		"stddev":     false,
+	}
+	for _, rateFunction := range query.request.RateFunctions {
+		_, exists := rateFunctions[rateFunction]
+		if exists == false {
+			return fmt.Errorf("unsupported rate function '%s'", rateFunction)
+		}
+
+		rateFunctions[rateFunction] = true
+	}
+
+	index := 0
+
+	timeData := []time.Time{}
+	rateData := []*int64{}
+
+	absenceData := []*float64{}
+	sumData := []*float64{}
+	averageData := []*float64{}
+	stdDevData := []*float64{}
+	quantile25Data := []*float64{}
+	quantile50Data := []*float64{}
+	quantile75Data := []*float64{}
+	quantile95Data := []*float64{}
+	quantile99Data := []*float64{}
+
+	for current_ns := from_ns; current_ns <= to_ns; current_ns += interval_ns {
+		count := int64(0)
+		values := []*float64{}
+
+		for index < timeField.Len() {
+			record_time := timeField.At(index).(*time.Time)
+			record_time_ns := record_time.UnixNano()
+			record_value := dataField.At(index).(*float64)
+			index++
+
+			if record_time_ns < current_ns {
+				continue
+			}
+
+			if record_time_ns > (current_ns + interval_ns) {
+				index--
+				break
+			}
+
+			count++
+
+			values = append(values, record_value)
+		}
+
+		current := time.Unix(0, int64(current_ns))
+
+		timeData = append(timeData, current)
+
+		if (count == 0) && (zeroVector == false) {
+			rateData = append(rateData, nil)
+		} else {
+			rateData = append(rateData, &count)
+		}
+
+		absenceData = append(absenceData, absence(count, zeroVector))
+		sumData = append(sumData, sum(values, zeroVector))
+		averageData = append(averageData, average(values, zeroVector))
+		stdDevData = append(stdDevData, standardDeviation(values, zeroVector))
+		quantile25Data = append(quantile25Data, quantile(0.25, values, zeroVector))
+		quantile50Data = append(quantile50Data, quantile(0.50, values, zeroVector))
+		quantile75Data = append(quantile75Data, quantile(0.75, values, zeroVector))
+		quantile95Data = append(quantile95Data, quantile(0.95, values, zeroVector))
+		quantile99Data = append(quantile99Data, quantile(0.99, values, zeroVector))
+	}
+
+	timeField = data.NewField(timeField.Name, nil, timeData)
+
+	frame.Fields = []*data.Field{timeField}
+
+	if enabled, exists := rateFunctions["count"]; exists && enabled {
+		countField := data.NewField("count", nil, rateData)
+		frame.Fields = append(frame.Fields, countField)
+	}
+
+	if enabled, exists := rateFunctions["sum"]; exists && enabled {
+		sumField := data.NewField("sum", nil, sumData)
+		frame.Fields = append(frame.Fields, sumField)
+	}
+
+	if enabled, exists := rateFunctions["absence"]; exists && enabled {
+		absenceField := data.NewField("absence", nil, absenceData)
+		frame.Fields = append(frame.Fields, absenceField)
+	}
+
+	if enabled, exists := rateFunctions["average"]; exists && enabled {
+		averageField := data.NewField("average", nil, averageData)
+		frame.Fields = append(frame.Fields, averageField)
+	}
+
+	if enabled, exists := rateFunctions["median"]; exists && enabled {
+		quantile50Field := data.NewField("median", nil, quantile50Data)
+		frame.Fields = append(frame.Fields, quantile50Field)
+	}
+
+	if enabled, exists := rateFunctions["quantile25"]; exists && enabled {
+		quantile25Field := data.NewField("quantile25", nil, quantile25Data)
+		frame.Fields = append(frame.Fields, quantile25Field)
+	}
+
+	if enabled, exists := rateFunctions["quantile75"]; exists && enabled {
+		quantile75Field := data.NewField("quantile75", nil, quantile75Data)
+		frame.Fields = append(frame.Fields, quantile75Field)
+	}
+
+	if enabled, exists := rateFunctions["quantile95"]; exists && enabled {
+		quantile95Field := data.NewField("quantile95", nil, quantile95Data)
+		frame.Fields = append(frame.Fields, quantile95Field)
+	}
+
+	if enabled, exists := rateFunctions["quantile99"]; exists && enabled {
+		quantile99Field := data.NewField("quantile99", nil, quantile99Data)
+		frame.Fields = append(frame.Fields, quantile99Field)
+	}
+
+	if enabled, exists := rateFunctions["stddev"]; exists && enabled {
+		stdDevField := data.NewField("stddev", nil, stdDevData)
+		frame.Fields = append(frame.Fields, stdDevField)
+	}
+
+	return nil
+}
+
+var zero = float64(0)
+var one = float64(1)
+
+func zeroOrNil(zeroVector bool) *float64 {
+	if zeroVector {
+		return &zero
+	} else {
+		return nil
+	}
+}
+
+func absence(count int64, zeroVector bool) *float64 {
+	if count != 0 {
+		return zeroOrNil(zeroVector)
+	} else {
+		return &one
+	}
+}
+
+func sum(values []*float64, zeroVector bool) *float64 {
+	if len(values) == 0 {
+		return zeroOrNil(zeroVector)
+	}
+
+	total := float64(0)
+	for _, value := range values {
+		if value != nil {
+			total = total + *value
+		}
+	}
+
+	if total == 0 {
+		return zeroOrNil(zeroVector)
+	} else {
+		return &total
+	}
+}
+
+func average(values []*float64, zeroVector bool) *float64 {
+	valueSum := sum(values, zeroVector)
+	if valueSum == nil || *valueSum == 0 {
+		return zeroOrNil(zeroVector)
+	}
+
+	average := *valueSum / float64(len(values))
+	return &average
+}
+
+func standardDeviation(values []*float64, zeroVector bool) *float64 {
+	valueAverage := average(values, zeroVector)
+	if valueAverage == nil || *valueAverage == 0 {
+		return zeroOrNil(zeroVector)
+	}
+
+	valueDifferences := []*float64{}
+	for _, value := range values {
+		if value != nil {
+			valueDifference := math.Pow(2, (*value)-(*valueAverage))
+			valueDifferences = append(valueDifferences, &valueDifference)
+		} else {
+			valueDifferences = append(valueDifferences, nil)
+		}
+	}
+
+	valueDifferenceSum := sum(valueDifferences, zeroVector)
+	if valueDifferenceSum == nil || *valueDifferenceSum == 0 {
+		return zeroOrNil(zeroVector)
+	}
+
+	if len(values) == 1 {
+		return zeroOrNil(zeroVector)
+	}
+
+	valueDifferenceSumMean := *valueDifferenceSum / float64(len(values)-1)
+	stdDev := math.Sqrt(valueDifferenceSumMean)
+	return &stdDev
+}
+
+func quantile(q float64, values []*float64, zeroVector bool) *float64 {
+	if len(values) == 0 {
+		return zeroOrNil(zeroVector)
+	}
+
+	sortedValues := make([]float64, 0)
+	for _, value := range values {
+		if value == nil {
+			return zeroOrNil(zeroVector)
+		}
+		sortedValues = append(sortedValues, *value)
+	}
+
+	sort.Float64s(sortedValues)
+
+	pos := float64(len(sortedValues)) * q
+	base := int(math.Floor(math.Sqrt(pos)))
+	rest := pos - float64(base)
+
+	result := sortedValues[base]
+
+	index := base + 1
+	if index < len(sortedValues) {
+		result = result + rest*(sortedValues[index]-sortedValues[base])
+	}
+
+	return &result
 }

@@ -1,0 +1,18 @@
+---
+apiVersion: 1
+datasources:
+- name: surrealdb
+  type: fiskaly-surrealdb-datasource
+  uid:  fiskaly-surrealdb-datasource
+  orgId: 1
+  version: 1
+  editable: false
+  isDefault: true
+  access: proxy
+  jsonData:
+    location: 'surrealdb:8000'
+    nameaddr: 'test'
+    database: 'test'
+    username: 'username'
+  secureJsonData:
+    password: 'password'
