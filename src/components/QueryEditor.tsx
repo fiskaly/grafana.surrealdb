@@ -273,15 +273,16 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
             }
         }}
         options={
-            [ { value: "absence", label: "Absence" }
+            [ { value: "count", label: "Count" }
+            , { value: "absence", label: "Absence" }
+            , { value: "sum", label: "Sum" }
             , { value: "average", label: "Average" }
             , { value: "median", label: "Median" }
-            , { value: "sum", label: "Sum" }
-            , { value: "stddev", label: "StdDev" }
             , { value: "quantile25", label: "Quantile25" }
             , { value: "quantile75", label: "Quantile75" }
             , { value: "quantile95", label: "Quantile95" }
             , { value: "quantile99", label: "Quantile99" }
+            , { value: "stddev", label: "StdDev" }
             ]
         }
         isSearchable={true}
