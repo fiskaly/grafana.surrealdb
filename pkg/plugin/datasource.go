@@ -689,6 +689,8 @@ func (r *Datasource) metricRate(query *queryData, dataResponse *backend.DataResp
 
 	queryRateInterval := query.request.RateInterval
 	if queryRateInterval != "" {
+		queryRateInterval = strings.Replace(queryRateInterval, "$interval", query.interval.String(), -1)
+
 		rateInterval, err := time.ParseDuration(queryRateInterval)
 		if err != nil {
 			return fmt.Errorf("invalid interval '%s': %w", queryRateInterval, err)
