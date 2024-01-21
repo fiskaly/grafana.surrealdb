@@ -41,6 +41,22 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
     , rateFunctions
     } = query;
 
+    if( query.rate === undefined ){
+	query.rate = false
+    }
+
+    if( query.rateZero === undefined ){
+	query.rateZero = true
+    }
+
+    if( query.rateInterval === undefined ){
+	query.rateInterval = ""
+    }
+
+    if( query.rateFunctions === undefined ){
+	query.rateFunctions = [ "count" ]
+    }
+
     return (
 <div className="gf-form">
   <VerticalGroup>
@@ -239,7 +255,7 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
       >
       <div style={{ minWidth: 245 }}>
       <QueryField
-        placeholder={""}
+        placeholder={"$interval"}
         portalOrigin=""
         query={rateInterval}
         disabled={false}
