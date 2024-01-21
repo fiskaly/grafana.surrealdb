@@ -72,7 +72,7 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
         isClearable={false}
         backspaceRemovesValue={false}
         onChange={(selected: SelectableValue<string>) => {
-            onChange({ ...query, mode: selected.value });
+            onChange({ ...query, mode: selected.value || "raw" });
             onRunQuery();
         }}
         options={
@@ -85,7 +85,7 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
         maxMenuHeight={500}
         placeholder={"placeholder"}
         noOptionsMessage={"No options found"}
-        value={ mode || "raw" }
+        value={ mode }
         width={14}
       />
       </InlineField>
