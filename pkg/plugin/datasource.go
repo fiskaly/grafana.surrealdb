@@ -174,6 +174,8 @@ type queryRequestData struct {
 	Timestamp     string   `json:"timestamp"`
 	LogMessage    string   `json:"logMessage"`
 	MetricData    string   `json:"metricData"`
+	Group         bool     `json:"group"`
+	GroupBy       string   `json:"groupBy"`
 	Rate          bool     `json:"rate"`
 	RateZero      bool     `json:"rateZero"`
 	RateInterval  string   `json:"rateInterval"`
@@ -247,6 +249,10 @@ func (r *Datasource) queryData(ctx context.Context, pCtx backend.PluginContext, 
 
 	if queryRequest.MetricData == "" {
 		queryRequest.MetricData = "value"
+	}
+
+	if queryRequest.GroupBy == "" {
+		queryRequest.GroupBy = "group"
 	}
 
 	surql = strings.Replace(surql, "$interval", queryInterval.String(), -1)
@@ -329,13 +335,25 @@ func (r *Datasource) queryData(ctx context.Context, pCtx backend.PluginContext, 
 			)
 		}
 
-		if query.request.Rate {
-			err = r.metricRate(&query, &dataResponse)
+		if query.request.Group {
+			err = r.metricGroup(&query, &dataResponse)
 			if err != nil {
 				return backend.ErrDataResponse(
 					backend.StatusBadRequest,
-					fmt.Sprintf("Rate failed: %v", err.Error()),
+					fmt.Sprintf("Group failed: %v", err.Error()),
 				)
+			}
+		}
+
+		if query.request.Rate {
+			for _, frame := range dataResponse.Frames {
+				err = r.metricRate(&query, frame)
+				if err != nil {
+					return backend.ErrDataResponse(
+						backend.StatusBadRequest,
+						fmt.Sprintf("Rate failed: %v", err.Error()),
+					)
+				}
 			}
 		}
 	}
@@ -614,16 +632,17 @@ func (r *Datasource) query(query string) (queryResponseData, error) {
 
 func (r *Datasource) metric(query *queryData, dataResponse *backend.DataResponse) error {
 	frames := dataResponse.Frames
-
-	var timeField *data.Field
-	var dataField *data.Field
-
 	if len(frames) != 1 {
 		return fmt.Errorf("multiple frames are not supported yet")
 	}
 
+	var timeField *data.Field
+	var dataField *data.Field
+	var groupByField *data.Field
+
 	timeFieldName := query.request.Timestamp
 	dataFieldName := query.request.MetricData
+	groupByFieldName := query.request.GroupBy
 	suggestions := ""
 
 	frame := frames[0]
@@ -641,6 +660,10 @@ func (r *Datasource) metric(query *queryData, dataResponse *backend.DataResponse
 		}
 		if fieldName == dataFieldName {
 			dataField = field
+			continue
+		}
+		if fieldName == groupByFieldName {
+			groupByField = field
 			continue
 		}
 	}
@@ -664,20 +687,80 @@ func (r *Datasource) metric(query *queryData, dataResponse *backend.DataResponse
 			suggestions,
 		)
 	}
+	if groupByField == nil && query.request.Group {
+		return fmt.Errorf(
+			"group by '%s' not found in data frame, available are: %v",
+			groupByFieldName,
+			suggestions,
+		)
+	}
 
 	frame.Fields = []*data.Field{timeField, dataField}
+
+	if query.request.Group {
+		frame.Fields = append(frame.Fields, groupByField)
+	}
 
 	return nil
 }
 
-func (r *Datasource) metricRate(query *queryData, dataResponse *backend.DataResponse) error {
+func (r *Datasource) metricGroup(query *queryData, dataResponse *backend.DataResponse) error {
 	frames := dataResponse.Frames
-
 	if len(frames) != 1 {
 		return fmt.Errorf("multiple frames are not supported yet")
 	}
+
 	frame := frames[0]
 
+	timeField := frame.Fields[0]    // see 'metric()'
+	dataField := frame.Fields[1]    // see 'metric()'
+	groupByField := frame.Fields[2] // see 'metric()'
+
+	groups := map[string]struct{}{}
+	groupTimeMap := map[string][]*time.Time{}
+	groupDataMap := map[string][]*float64{}
+
+	index := 0
+	for index < groupByField.Len() {
+		key := fmt.Sprintf("%s", groupByField.At(index))
+		groups[key] = struct{}{}
+
+		groupTime := timeField.At(index).(*time.Time)
+		groupData := dataField.At(index).(*float64)
+
+		_, groupTimeExists := groupTimeMap[key]
+		if groupTimeExists == false {
+			groupTimeMap[key] = []*time.Time{}
+		}
+		groupTimeMap[key] = append(groupTimeMap[key], groupTime)
+
+		_, groupDataExists := groupDataMap[key]
+		if groupDataExists == false {
+			groupDataMap[key] = []*float64{}
+		}
+		groupDataMap[key] = append(groupDataMap[key], groupData)
+
+		index++
+	}
+
+	dataResponse.Frames = []*data.Frame{}
+
+	for key, _ := range groups {
+		groupFrame := data.NewFrame(key)
+
+		groupTimeField := data.NewField(timeField.Name, nil, groupTimeMap[key])
+		groupFrame.Fields = append(groupFrame.Fields, groupTimeField)
+
+		groupDataField := data.NewField(dataField.Name, nil, groupDataMap[key])
+		groupFrame.Fields = append(groupFrame.Fields, groupDataField)
+
+		dataResponse.Frames = append(dataResponse.Frames, groupFrame)
+	}
+
+	return nil
+}
+
+func (r *Datasource) metricRate(query *queryData, frame *data.Frame) error {
 	timeField := frame.Fields[0] // see 'metric()'
 	dataField := frame.Fields[1] // see 'metric()'
 
