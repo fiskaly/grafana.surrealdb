@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+Enabled Grafana policy token for signing the data source plugin in order to be published in the Grafana plugin catalog.
+
 ## 0.1.1
 
 Added additional optional `scope` for data source configuration.
