@@ -14,7 +14,8 @@ grafana.surrealdb is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE. See the Apache License 2.0 for more details.
 
-You should have received a copy of the Apache License 2.0 along with grafana.surrealdb. If not, see <https://www.apache.org/licenses/LICENSE-2.0>
+You should have received a copy of the Apache License 2.0 along with grafana.surrealdb.
+If not, see <https://www.apache.org/licenses/LICENSE-2.0>
 
 ---:Apache-2.0
 

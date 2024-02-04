@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0
+
+Provided new `groupBy` functionality in `metric` query mode in order to perform data grouping for plain `metric` values as well as `rate` based functions.
+Updated plugin documentation and screenshots.
+
 ## 0.1.2
 
 Enabled Grafana policy token for signing the data source plugin in order to be published in the Grafana plugin catalog.

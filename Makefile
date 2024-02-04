@@ -40,6 +40,7 @@ check:
 	npx @grafana/levitate@latest is-compatible --path src/module.ts --target @grafana/data,@grafana/ui,@grafana/runtime
 
 clean:
+	rm -f ${ASSETS}
 	rm -rf ./dist
 
 clean-all: clean
@@ -51,6 +52,8 @@ ASSETS += src/img/screenshot-config-editor.png
 ASSETS += src/img/screenshot-query-editor-raw.png
 ASSETS += src/img/screenshot-query-editor-log.png
 ASSETS += src/img/screenshot-query-editor-metric.png
+ASSETS += src/img/screenshot-query-editor-metric-rate.png
+ASSETS += src/img/screenshot-query-editor-metric-group.png
 
 assets: ${ASSETS}
 
@@ -64,16 +67,24 @@ src/img/logo-large.png:
 
 src/img/screenshot-config-editor.png:
 	curl -s -J -L -o $@ \
-	https://github.com/fiskaly/grafana.surrealdb/assets/6830431/01590b63-c23e-4915-b690-093fb796e8dd
+	https://github.com/fiskaly/grafana.surrealdb/assets/6830431/8f4b0e53-e5b9-4abb-80a4-612c1291c3c5
 
 src/img/screenshot-query-editor-raw.png:
 	curl -s -J -L -o $@ \
-	https://github.com/fiskaly/grafana.surrealdb/assets/6830431/2ee98536-636a-4690-8856-65ea0d60b96c
+	https://github.com/fiskaly/grafana.surrealdb/assets/6830431/23e374ed-f94e-413e-9d6b-5ff600fb11e3
 
 src/img/screenshot-query-editor-log.png:
 	curl -s -J -L -o $@ \
-	https://github.com/fiskaly/grafana.surrealdb/assets/6830431/e32f9ff9-bfac-4ae6-b037-fbf44c6ae9ec
+	https://github.com/fiskaly/grafana.surrealdb/assets/6830431/d3f90a5a-b905-46f6-b52c-5ab1bdca360b
 
 src/img/screenshot-query-editor-metric.png:
 	curl -s -J -L -o $@ \
-	https://github.com/fiskaly/grafana.surrealdb/assets/6830431/4d12d31c-4033-4c6d-b6d1-0096a7cabc37
+	https://github.com/fiskaly/grafana.surrealdb/assets/6830431/ff435b1f-4e58-43bb-acd2-b7bd9ea3a392
+
+src/img/screenshot-query-editor-metric-rate.png:
+	curl -s -J -L -o $@ \
+	https://github.com/fiskaly/grafana.surrealdb/assets/6830431/bbb8def8-be10-42c2-9779-9cd747ff5620
+
+src/img/screenshot-query-editor-metric-group.png:
+	curl -s -J -L -o $@ \
+	https://github.com/fiskaly/grafana.surrealdb/assets/6830431/9e819cec-cd70-4530-b3ef-f7bca156c3c1
