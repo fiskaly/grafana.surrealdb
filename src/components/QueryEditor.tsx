@@ -35,11 +35,17 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
     , timestamp
     , logMessage
     , metricData
+    , group
+    , groupBy
     , rate
     , rateZero
     , rateInterval
     , rateFunctions
     } = query;
+
+    if( query.group === undefined ){
+	query.group = false
+    }
 
     if( query.rate === undefined ){
 	query.rate = false
@@ -194,6 +200,51 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
         disabled={false}
         onChange={(value: string) => {
             onChange({ ...query, metricData: value });
+            if( requery ) {
+                onRunQuery();
+            }
+        }}
+        onBlur={() => {}}
+          />
+          </div>
+        </InlineField>
+}
+      </HorizontalGroup>
+      <HorizontalGroup>
+{ (mode === "metric") &&
+      <InlineField
+        label="Group By"
+        labelWidth={12}
+        tooltip="Enable metric grouping."
+      >
+      <InlineSwitch
+        value={group}
+        disabled={false}
+        transparent={false}
+        onChange={(event: ChangeEvent<HTMLInputElement>) => {
+            let checked = event.target.checked;
+            onChange({ ...query, group: checked });
+            if( requery ) {
+                onRunQuery();
+            }
+        }}
+      />
+      </InlineField>
+}
+{ (mode === "metric") && group &&
+      <InlineField
+        label="Field"
+        labelWidth={14}
+        tooltip="Metric group by field."
+      >
+      <div style={{ minWidth: 245 }}>
+      <QueryField
+        placeholder={"group"}
+        portalOrigin=""
+        query={groupBy}
+        disabled={false}
+        onChange={(value: string) => {
+            onChange({ ...query, groupBy: value });
             if( requery ) {
                 onRunQuery();
             }

@@ -13,6 +13,8 @@ export interface MyQuery extends DataQuery {
     timestamp?: string;
     logMessage?: string;
     metricData?: string;
+    group?: boolean;
+    groupBy?: string;
     rate?: boolean;
     rateZero?: boolean;
     rateInterval?: string;
