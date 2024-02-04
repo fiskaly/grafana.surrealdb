@@ -18,7 +18,7 @@
         "url": "https://github.com/fiskaly/grafana.surrealdb"
       },
       {
-        "name": "Open Source License",
+        "name": "License Information",
         "url": "https://github.com/fiskaly/grafana.surrealdb/blob/v%VERSION%/LICENSE"
       }
     ],
@@ -38,6 +38,14 @@
       {
         "name": "Query Metric Data",
         "path": "img/screenshot-query-editor-metric.png"
+      },
+      {
+        "name": "Query Metric Rate",
+        "path": "img/screenshot-query-editor-metric-rate.png"
+      },
+      {
+        "name": "Query Metric Group",
+        "path": "img/screenshot-query-editor-metric-group.png"
       }
     ],
     "version": "%VERSION%",
