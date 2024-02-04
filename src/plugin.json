@@ -7,12 +7,21 @@
     "author": {
       "name": "fiskaly"
     },
-    "keywords": ["datasource"],
+    "keywords": ["datasource", "surrealdb", "sql"],
     "logos": {
       "small": "img/logo-small.png",
       "large": "img/logo-large.png"
     },
-    "links": [],
+    "links": [
+      {
+        "name": "Open Source Project",
+        "url": "https://github.com/fiskaly/grafana.surrealdb"
+      },
+      {
+        "name": "Open Source License",
+        "url": "https://github.com/fiskaly/grafana.surrealdb/blob/v%VERSION%/LICENSE"
+      }
+    ],
     "screenshots": [
       {
         "name": "Datasource",
