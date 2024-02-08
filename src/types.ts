@@ -25,7 +25,7 @@ export const DEFAULT_QUERY: Partial<MyQuery> =
 { mode: "raw"
 , surql: "info for database"
 , requery: true
-};
+}
 
 /**
  * These are options configured for each DataSource instance
