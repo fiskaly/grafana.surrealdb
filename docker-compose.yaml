@@ -27,6 +27,7 @@ services:
       - ./.attic/surrealdb:/surreal.db
     command: |
       start
+      --auth
       --log trace
       --user root
       --pass root

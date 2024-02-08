@@ -162,7 +162,7 @@
           "mode": "raw",
           "refId": "A",
           "requery": true,
-          "surql": "select * from timeseries:[$from]..[$to]"
+          "surql": "select * from timeseries:[$from]..[$to] where level in \"$variable\""
         }
       ],
       "title": "Timeseries Data Table",
@@ -257,7 +257,7 @@
           "mode": "raw",
           "refId": "A",
           "requery": true,
-          "surql": "select * from timeseries:..[$to]"
+          "surql": "select * from timeseries:..[$to] where level in \"$variable\""
         }
       ],
       "title": "Timeseries Value",
@@ -359,7 +359,7 @@
           "rateZero": true,
           "refId": "A",
           "requery": true,
-          "surql": "select * from timeseries:[$from]..[$to]"
+          "surql": "select * from timeseries:[$from]..[$to] where level in \"$variable\""
         }
       ],
       "title": "Timeseries Rate Grouped By Level",
@@ -471,7 +471,7 @@
           "rateZero": true,
           "refId": "A",
           "requery": true,
-          "surql": "select * from timeseries:[$from]..[$to]",
+          "surql": "select * from timeseries:[$from]..[$to] where level in \"$variable\"",
           "timestamp": ""
         }
       ],
@@ -483,7 +483,38 @@
   "schemaVersion": 38,
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "allValue": "",
+        "current": {
+          "selected": false,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "fiskaly-surrealdb-datasource",
+          "uid": "fiskaly-surrealdb-datasource"
+        },
+        "definition": "select level from timeseries",
+        "description": "Variable-based query to filter data by log level.",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Log Level",
+        "multi": true,
+        "name": "variable",
+        "options": [],
+        "query": "select level from timeseries",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-2m",
