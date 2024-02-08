@@ -25,7 +25,7 @@ Since the plugin is used to query the contents of one or multiple SurrealDB [tab
 The plugin can be installed through the user interface in the Grafana service itself or by using the command-line utility via:
 
 ```
-$ grafana-cli plugins install fiskaly-surrealdb-datasource
+$ grafana cli plugins install fiskaly-surrealdb-datasource
 ```
 
 If the Grafana service was setup in a containerized context via e.g. `docker-compose` or started locally on a machine the plugin can be installed automatically for the Grafana instance during start-up by setting the following environment variable:
@@ -72,6 +72,14 @@ Furthermore, based on the `Data` column there is an option to perform data group
 
 ![query](https://github.com/fiskaly/grafana.surrealdb/assets/6830431/77f47494-1815-48bc-8e40-ff43822bc68d)
 
+## Variable Query
+
+This plugin provides `raw` query support for dashboard variables.
+The values of the first column in the query response are used for the result set of values for the defined variable in the dashboard.
+
+---
+
+![variable-query](https://github.com/fiskaly/grafana.surrealdb/assets/6830431/ec84cade-49ac-49d4-9479-323429641ee3)
 
 ## Design
 
@@ -81,7 +89,7 @@ The frontend is written in TypeScript and provides two major components:
 (2) a `QueryEditor` to write queries in SurrealDB Query Language ([SurrealQL](https://docs.surrealdb.com/docs/surrealql/overview/)), configure the query mode, and interact with the backend part of the data source plugin.
 
 The backend is written in Golang and provides a low-level connection through the SurrealDB [WebSocket](https://docs.surrealdb.com/docs/integration/websocket) interface.
-After the successful connection and [signin](https://docs.surrealdb.com/docs/integration/websocket/#signin) operation, all queries send from the frontend part to the backend part are directly executed through the WebSocket connection using the [custom query](https://docs.surrealdb.com/docs/integration/websocket#query) operation.
+After the successful connection and [signin](https://docs.surrealdb.com/docs/integration/websocket/#signin) operation, all queries sent from the frontend part to the backend part are directly executed through the WebSocket connection using the [custom query](https://docs.surrealdb.com/docs/integration/websocket#query) operation.
 
 Since SurrealDB as well as Grafana support [variables](https://grafana.com/docs/grafana/latest/dashboards/variables/) the plugin supports and performs the following variable resolving steps:
 (1) in the frontend part are all Grafana scope provided variables replaced; and
