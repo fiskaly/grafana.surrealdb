@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+Provided dashboard variable-based query support.
+
 ## 0.2.0
 
 Provided new `groupBy` functionality in `metric` query mode in order to perform data grouping for plain `metric` values as well as `rate` based functions.
