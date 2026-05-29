@@ -597,7 +597,7 @@ func (r *Datasource) query(query string) (queryResponseData, error) {
 
 	// log.DefaultLogger.Info(fmt.Sprintf("arrResp: %s", arrResp))
 
-	dataMap, ok := array[0].(map[string]interface{})
+	dataMap, ok := array[len(array)-1].(map[string]interface{})
 	if ok == false || isArray == false {
 		return undefined, fmt.Errorf("invalid queryResponse array type")
 	}
